@@ -1,0 +1,445 @@
+-- Normal Script: ServerScriptService/NoxiaLogs/MainScript
+local HttpService = game:GetService("HttpService")
+local RunService = game:GetService("RunService")
+local Players = game:GetService("Players")
+
+-- Config modülünü yükle
+local Config = require(script.Parent.Config)
+
+-- Global değişkenler
+_G.NoxiaLogs = {
+	SystemInfo = {
+		Name = Config.SystemName,
+		Version = Config.Version,
+		Status = "Active"
+	},
+	Stats = {
+		TotalLogsSent = 0,
+		LastError = nil,
+		StartupTime = os.time()
+	}
+}
+
+-- Utility fonksiyonlar
+local function formatTimestamp()
+	local currentTime = os.date("*t")
+	return string.format("%02d/%02d/%04d %02d:%02d:%02d", 
+		currentTime.day, currentTime.month, currentTime.year,
+		currentTime.hour, currentTime.min, currentTime.sec)
+end
+
+-- Webhook gönderme fonksiyonu
+local function SendWebhook(webhookType, embedData)
+	if not Config.Enabled then 
+		if Config.DebugMode then
+			print("❌ NoxiaLogs: Sistem devre dışı")
+		end
+		return false 
+	end
+
+	-- Config'ten webhook URL'sini çek
+	local webhookUrl = Config.Webhooks[webhookType]
+
+	if Config.DebugMode then
+		print("🔍 NoxiaLogs Debug:")
+		print("Webhook Type: " .. webhookType)
+		print("Webhook URL: " .. tostring(webhookUrl))
+	end
+
+	if not webhookUrl or webhookUrl == "" or string.find(webhookUrl, "your_webhook_url") then
+		warn("❌ NoxiaLogs: " .. webhookType .. " webhook URL'si ayarlanmamış")
+		return false
+	end
+
+	local data = {
+		embeds = {embedData}
+	}
+
+	local success, result = pcall(function()
+		local jsonData = HttpService:JSONEncode(data)
+		if Config.DebugMode then
+			print("📤 NoxiaLogs: Webhook gönderiliyor...")
+		end
+		return HttpService:PostAsync(webhookUrl, jsonData, Enum.HttpContentType.ApplicationJson)
+	end)
+
+	if success then
+		_G.NoxiaLogs.Stats.TotalLogsSent += 1
+		if Config.DebugMode then
+			print("✅ NoxiaLogs: " .. webhookType .. " webhook'u başarıyla gönderildi")
+			print("📊 Toplam gönderilen log: " .. _G.NoxiaLogs.Stats.TotalLogsSent)
+		end
+	else
+		warn("❌ NoxiaLogs Webhook Error (" .. webhookType .. "): " .. tostring(result))
+	end
+
+	return success
+end
+
+-- Sohbet Log Fonksiyonu
+function _G.NoxiaLogs_LogChat(player, message)
+	if not Config.ChatLog.Enabled then 
+		if Config.DebugMode then
+			print("❌ NoxiaLogs: Sohbet log devre dışı")
+		end
+		return 
+	end
+
+	if Config.DebugMode then
+		print("🔍 NoxiaLogs: Sohbet log başlatılıyor...")
+		print("Oyuncu: " .. player.Name)
+		print("Mesaj: " .. message)
+	end
+
+	-- Filtreleme kontrolü
+	if Config.ChatLog.IgnoreList and table.find(Config.ChatLog.IgnoreList, player.UserId) then 
+		if Config.DebugMode then
+			print("❌ NoxiaLogs: Oyuncu ignore list'te")
+		end
+		return 
+	end
+
+	if Config.ChatLog.FilterBadWords and Config.ChatLog.BadWordsList then
+		for _, badWord in ipairs(Config.ChatLog.BadWordsList) do
+			if string.lower(message):find(string.lower(badWord)) then
+				if Config.DebugMode then
+					print("❌ NoxiaLogs: Kötü kelime filtrelendi")
+				end
+				return
+			end
+		end
+	end
+
+	local embed = {
+		title = "💬 Sohbet Mesajı",
+		color = Config.Colors.Chat,
+		fields = {
+			{
+				name = "👤 Kullanıcı",
+				value = player.Name,
+				inline = true
+			},
+			{
+				name = "🆔 Roblox ID",
+				value = tostring(player.UserId),
+				inline = true
+			},
+			{
+				name = "📝 Mesaj",
+				value = message,
+				inline = false
+			},
+			{
+				name = "🕐 Zaman",
+				value = formatTimestamp(),
+				inline = false
+			}
+		},
+		footer = {
+			text = Config.SystemName .. " " .. Config.Version
+		}
+	}
+
+	if Config.DebugMode then
+		print("📨 NoxiaLogs: Sohbet embed hazır, gönderiliyor...")
+	end
+
+	return SendWebhook("Chat", embed)
+end
+
+-- Giriş Log Fonksiyonu
+function _G.NoxiaLogs_LogJoin(player)
+	if not Config.JoinLeaveLog.Enabled then 
+		if Config.DebugMode then
+			print("❌ NoxiaLogs: Giriş log devre dışı")
+		end
+		return 
+	end
+
+	if Config.DebugMode then
+		print("🔍 NoxiaLogs: Giriş log başlatılıyor...")
+		print("Oyuncu: " .. player.Name)
+	end
+
+	local accountAge = player.AccountAge
+	local profileLink = "https://www.roblox.com/users/" .. player.UserId .. "/profile"
+	local warnings = ""
+
+	if Config.JoinLeaveLog.WarnNewAccounts and accountAge < Config.JoinLeaveLog.NewAccountThreshold then
+		warnings = "🚨 **YENİ HESAP UYARISI:** " .. accountAge .. " günlük hesap\n"
+	end
+
+	local embed = {
+		title = "✅ Oyuncu Giriş Yaptı",
+		color = Config.Colors.Join,
+		description = warnings,
+		fields = {
+			{
+				name = "👤 Kullanıcı",
+				value = player.Name,
+				inline = true
+			},
+			{
+				name = "🆔 Roblox ID",
+				value = tostring(player.UserId),
+				inline = true
+			},
+			{
+				name = "📅 Hesap Yaşı",
+				value = accountAge .. " gün",
+				inline = true
+			},
+			{
+				name = "🕐 Giriş Zamanı",
+				value = formatTimestamp(),
+				inline = false
+			}
+		},
+		footer = {
+			text = Config.SystemName .. " " .. Config.Version
+		}
+	}
+
+	if Config.JoinLeaveLog.ShowProfileLinks then
+		table.insert(embed.fields, 4, {
+			name = "🔗 Profil",
+			value = "[Profil Linki](" .. profileLink .. ")",
+			inline = false
+		})
+	end
+
+	if Config.DebugMode then
+		print("📨 NoxiaLogs: Giriş embed hazır, gönderiliyor...")
+	end
+
+	return SendWebhook("JoinLeave", embed)
+end
+
+-- Çıkış Log Fonksiyonu
+function _G.NoxiaLogs_LogLeave(player)
+	if not Config.JoinLeaveLog.Enabled then 
+		if Config.DebugMode then
+			print("❌ NoxiaLogs: Çıkış log devre dışı")
+		end
+		return 
+	end
+
+	if Config.DebugMode then
+		print("🔍 NoxiaLogs: Çıkış log başlatılıyor...")
+		print("Oyuncu: " .. player.Name)
+	end
+
+	local accountAge = player.AccountAge
+	local profileLink = "https://www.roblox.com/users/" .. player.UserId .. "/profile"
+
+	local embed = {
+		title = "❌ Oyuncu Çıkış Yaptı",
+		color = Config.Colors.Leave,
+		fields = {
+			{
+				name = "👤 Kullanıcı",
+				value = player.Name,
+				inline = true
+			},
+			{
+				name = "🆔 Roblox ID",
+				value = tostring(player.UserId),
+				inline = true
+			},
+			{
+				name = "📅 Hesap Yaşı",
+				value = accountAge .. " gün",
+				inline = true
+			},
+			{
+				name = "🕐 Çıkış Zamanı",
+				value = formatTimestamp(),
+				inline = false
+			}
+		},
+		footer = {
+			text = Config.SystemName .. " " .. Config.Version
+		}
+	}
+
+	if Config.JoinLeaveLog.ShowProfileLinks then
+		table.insert(embed.fields, 4, {
+			name = "🔗 Profil",
+			value = "[Profil Linki](" .. profileLink .. ")",
+			inline = false
+		})
+	end
+
+	if Config.DebugMode then
+		print("📨 NoxiaLogs: Çıkış embed hazır, gönderiliyor...")
+	end
+
+	return SendWebhook("JoinLeave", embed)
+end
+
+-- Hata Log Fonksiyonu
+function _G.NoxiaLogs_LogError(errorType, errorMessage, player)
+	if not Config.ErrorLog.Enabled then return end
+
+	local embed = {
+		title = "⚠️ Sistem Hatası",
+		color = Config.Colors.Error,
+		fields = {
+			{
+				name = "🔧 Hata Türü",
+				value = errorType,
+				inline = true
+			},
+			{
+				name = "📝 Hata Mesajı",
+				value = "```" .. tostring(errorMessage) .. "```",
+				inline = false
+			},
+			{
+				name = "🕐 Zaman",
+				value = formatTimestamp(),
+				inline = false
+			}
+		},
+		footer = {
+			text = Config.SystemName .. " " .. Config.Version
+		}
+	}
+
+	if player then
+		table.insert(embed.fields, 1, {
+			name = "👤 Kullanıcı",
+			value = player.Name .. " (ID: " .. player.UserId .. ")",
+			inline = true
+		})
+	end
+
+	return SendWebhook("Errors", embed)
+end
+
+-- Data Log Fonksiyonu
+function _G.NoxiaLogs_LogData(action, player, details)
+	if not Config.DataLog.Enabled then return end
+
+	local embed = {
+		title = "💾 Data İşlemi",
+		color = Config.Colors.Data,
+		fields = {
+			{
+				name = "🔧 İşlem",
+				value = action,
+				inline = true
+			},
+			{
+				name = "👤 Kullanıcı",
+				value = player and player.Name .. " (ID: " .. player.UserId .. ")" or "Sistem",
+				inline = true
+			},
+			{
+				name = "📝 Detaylar",
+				value = tostring(details),
+				inline = false
+			},
+			{
+				name = "🕐 Zaman",
+				value = formatTimestamp(),
+				inline = false
+			}
+		},
+		footer = {
+			text = Config.SystemName .. " " .. Config.Version
+		}
+	}
+
+	return SendWebhook("Data", embed)
+end
+
+-- Performans Log Fonksiyonu
+function _G.NoxiaLogs_LogPerformance(stats, isEmergency)
+	if not Config.PerformanceLog.Enabled then return end
+
+	local color = isEmergency and Config.Colors.Error or Config.Colors.Performance
+
+	local embed = {
+		title = "📊 Performans Raporu",
+		color = color,
+		fields = {
+			{
+				name = "👥 Oyuncu Sayısı",
+				value = stats.playerCount .. "/" .. stats.maxPlayers,
+				inline = true
+			},
+			{
+				name = "⚡ FPS",
+				value = tostring(stats.averageFPS),
+				inline = true
+			},
+			{
+				name = "💾 Memory",
+				value = stats.totalMemory .. "MB",
+				inline = true
+			},
+			{
+				name = "🕐 Zaman",
+				value = formatTimestamp(),
+				inline = false
+			}
+		},
+		footer = {
+			text = Config.SystemName .. " " .. Config.Version
+		}
+	}
+
+	if isEmergency then
+		embed.description = "🚨 ACİL PERFORMANS UYARISI"
+	end
+
+	return SendWebhook("Performance", embed)
+end
+
+-- Otomatik giriş-çıkış loglama
+Players.PlayerAdded:Connect(function(player)
+	_G.NoxiaLogs_LogJoin(player)
+end)
+
+Players.PlayerRemoving:Connect(function(player)
+	_G.NoxiaLogs_LogLeave(player)
+end)
+
+-- Otomatik sohbet loglama
+local function onPlayerAdded(player)
+	player.Chatted:Connect(function(message)
+		_G.NoxiaLogs_LogChat(player, message)
+	end)
+end
+
+Players.PlayerAdded:Connect(onPlayerAdded)
+
+-- Zaten oyunda olan oyuncular için
+for _, player in ipairs(Players:GetPlayers()) do
+	onPlayerAdded(player)
+end
+
+-- Sistem başlatma mesajı
+print("🚀 Noxia Logs Systems " .. Config.Version .. " başlatıldı!")
+print("📊 Aktif modüller:")
+print("   ✅ Sohbet Log: " .. tostring(Config.ChatLog.Enabled))
+print("   ✅ Giriş-Çıkış Log: " .. tostring(Config.JoinLeaveLog.Enabled))
+print("   ✅ Hata Log: " .. tostring(Config.ErrorLog.Enabled))
+print("   ✅ Data Log: " .. tostring(Config.DataLog.Enabled))
+print("   ✅ Performans Log: " .. tostring(Config.PerformanceLog.Enabled))
+
+-- Test mesajı (opsiyonel)
+if Config.DebugMode then
+	wait(5)
+	print("🧪 NoxiaLogs: Test logları gönderiliyor...")
+
+	local testPlayer = {
+		Name = "TestPlayer",
+		UserId = 123456,
+		AccountAge = 5
+	}
+
+	_G.NoxiaLogs_LogChat(testPlayer, "Sistem test mesajı!")
+	_G.NoxiaLogs_LogJoin(testPlayer)
+end
