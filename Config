@@ -1,0 +1,94 @@
+-- ModuleScript: ServerScriptService/NoxiaLogs/Config
+local Config = {}
+
+-- Sistem bilgisi
+Config.SystemName = "Noxia Logs Systems"  -- Log sisteminin görünen adı
+Config.Version = "v1.0"                   -- Sistem versiyonu
+Config.Author = "Noxia Team - Crafy"              -- Geliştirici bilgisi
+
+-- Ana ayarlar
+Config.Enabled = true                      -- Tüm log sistemini aç/kapa
+Config.DebugMode = true                    -- Hata ayıklama mesajlarını göster/gizle
+
+-- Discord Webhook URL'leri
+Config.Webhooks = {
+	Performance = "https://discord.com/api/webhooks/WEBHOOK_URL",  -- Performans raporları için webhook
+	Chat = "https://discord.com/api/webhooks/WEBHOOK_URL",   -- Sohbet mesajları için webhook
+	JoinLeave = "https://discord.com/api/webhooks/WEBHOOK_URL", -- Giriş/çıkış logları için webhook
+	Errors = "https://discord.com/api/webhooks/WEBHOOK_URL",  -- Hata logları için webhook
+	Data = "https://discord.com/api/webhooks/WEBHOOK_URL"     -- Data işlemleri için webhook
+}
+
+-- Performans Log Ayarları
+Config.PerformanceLog = {
+	Enabled = true,                        -- Performans log sistemini aç/kapa
+	CheckInterval = 900,                   -- Performans kontrol aralığı (saniye) - 15 dakika
+	CriticalMemoryThreshold = 500,         -- Kritik memory uyarı eşiği (MB)
+	CriticalFPSThreshold = 20,             -- Kritik FPS uyarı eşiği
+	CriticalPlayerThreshold = 0.8,         -- Kritik oyuncu yoğunluğu eşiği (%80)
+	SendEmergencyAlerts = true,            -- Acil durum uyarılarını aç/kapa
+	EmergencyCheckInterval = 60,           -- Acil durum kontrol aralığı (saniye) - 1 dakika
+	MonitorCPU = true,                     -- CPU kullanımını izle
+	MonitorMemory = true,                  -- Memory kullanımını izle
+	MonitorNetwork = true,                 -- Network kullanımını izle
+	MonitorFPS = true                      -- FPS değerlerini izle
+}
+
+-- Sohbet Log Ayarları
+Config.ChatLog = {
+	Enabled = true,                        -- Sohbet log sistemini aç/kapa
+	LogAllMessages = true,                 -- Tüm sohbet mesajlarını logla
+	LogPrivateMessages = true,             -- Özel mesajları logla
+	FilterBadWords = false,                -- Kötü kelime filtresini aç/kapa
+	BadWordsList = {},                     -- Filtrelenecek kötü kelime listesi
+	IgnoreList = {}                        -- Loglanmayacak kullanıcı ID listesi
+}
+
+-- Giriş-Çıkış Log Ayarları
+Config.JoinLeaveLog = {
+	Enabled = true,                        -- Giriş/çıkış log sistemini aç/kapa
+	LogAccountAge = true,                  -- Hesap yaşını logla
+	WarnNewAccounts = true,                -- Yeni hesaplar için uyarı göster
+	NewAccountThreshold = 14,              -- Yeni hesap uyarı eşiği (gün)
+	ShowProfileLinks = true,               -- Profil linklerini göster
+	LogRejoinTime = true,                  -- Yeniden giriş süresini logla
+	RejoinThreshold = 300                  -- Yeniden giriş zaman eşiği (saniye) - 5 dakika
+}
+
+-- Hata & Bug Log Ayarları
+Config.ErrorLog = {
+	Enabled = true,                        -- Hata log sistemini aç/kapa
+	LogScriptErrors = true,                -- Script hatalarını logla
+	LogHttpErrors = true,                  -- HTTP hatalarını logla
+	LogDataStoreErrors = true,             -- DataStore hatalarını logla
+	LogSecurityErrors = true,              -- Güvenlik hatalarını logla
+	RateLimit = {
+		Enabled = true,                    -- Hata rate limitini aç/kapa
+		MaxErrorsPerMinute = 15,           -- Dakikada maksimum hata sayısı
+		CooldownTime = 60                  -- Rate limit cooldown süresi (saniye)
+	}
+}
+
+-- Data Log Ayarları
+Config.DataLog = {
+	Enabled = true,                        -- Data log sistemini aç/kapa
+	LogDataSaves = true,                   -- Data kaydetme işlemlerini logla
+	LogDataLoads = false,                  -- Data yükleme işlemlerini logla (yüksek trafik oluşturabilir)
+	LogDataErrors = true,                  -- Data hatalarını logla
+	LogDataCorruption = true               -- Data bozulması durumlarını logla
+}
+
+-- Renk ayarları (Discord embed renk kodları)
+Config.Colors = {
+	Success = 3066993,                     -- Başarılı işlemler için yeşil renk
+	Warning = 16776960,                    -- Uyarılar için sarı renk
+	Error = 15158332,                      -- Hatalar için kırmızı renk
+	Info = 3447003,                        -- Bilgi mesajları için mavi renk
+	Performance = 10181046,                -- Performans raporları için mor renk
+	Chat = 15844367,                       -- Sohbet mesajları için altın rengi
+	Join = 5763719,                        -- Giriş logları için açık yeşil
+	Leave = 15548997,                      -- Çıkış logları için açık kırmızı
+	Data = 7419530                         -- Data logları için turkuaz
+}
+
+return Config
